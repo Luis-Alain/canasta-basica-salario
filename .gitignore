@@ -1,0 +1,26 @@
+# Entorno
+.venv/
+venv/
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Limpiezas a medias; las tablas finales viven en data/processed/
+data/interim/
+
+# Sistema y editores
+.DS_Store
+.idea/
+.vscode/

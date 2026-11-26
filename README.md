@@ -8,7 +8,7 @@ El análisis no inventa cifras. Cada número sale de una fuente oficial (INEC, A
 
 Cuatro bloques, siempre dentro de la provincia de Panamá (en las series viejas, los distritos de Panamá y San Miguelito):
 
-1. **IPC y costo de la canasta.** Índice de precios del INEC y costo mensual de la canasta de ACODECO y del MEF.
+1. **IPC y costo de la canasta.** Índice de precios del INEC y costo mensual de la canasta de ACODECO y del MEF ( + calcular inflacion)
 2. **Salario mínimo.** Tasas de la Región 1 y de la Región 2 (comercio al por menor y trabajo doméstico) según los decretos vigentes en cada año.
 3. **Poder adquisitivo.** Qué parte del salario de la Región 1 alcanza para pagar la canasta, y si la comida subió más que el salario.
 4. **Supermercados.** Precio de los 59 productos por establecimiento (CSV de ACODECO en 2019 y 2022, y el PDF quincenal de septiembre de 2026).

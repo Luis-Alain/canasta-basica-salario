@@ -114,7 +114,7 @@ indice_2024base = indice_2013base * factor
    - Cuadro 5, 2019: total −0.3 %, alimentos +0.3 %.
    - Cuadro 5, 2022: total +2.6 %, alimentos +3.9 %.
    - Cuadro 7, octubre 2026 / octubre 2025: total +3.3 %, alimentos +2.6 % (columna `notas` de `ipc.csv`).
-   `src/consulta_ipc_canasta.py` muestra esas tres parejas. No recalcula una interanual cruzando bases.
+   `src/consulta_ipc_canasta.py` escribe las tres figuras del bloque con esas variaciones. No recalcula una interanual cruzando bases.
 6. El costo de la canasta, en balboas, sí se compara en los tres años. ACODECO y el MEF siguen en paralelo. Las otras dos figuras del bloque son `aumento_canasta_salario.png` (incremento % 2019→2022→2026 de la canasta ACODECO y del salario de la Región 1) y `canasta_vs_salario.png` (costo en balboas frente a ese salario).
 7. El Anexo 4 (nacional urbano, enero 2024–octubre 2026, ya en 2024=100) solo sirve como contexto nacional, no como serie del proyecto:  
    https://www.inec.gob.pa/archivos/A0705547520261117084308Anexo%204.xlsx
@@ -305,7 +305,7 @@ canasta-basica-salario/
 │   ├── io_inec.py                     # Cuadro 6 CSV y Cuadros 7 y 8; arma ipc
 │   ├── io_mef.py                      # Costo PySM desde cada PDF del MEF
 │   ├── io_salarios.py                 # Tasas ya verificadas de los tres decretos
-│   └── consulta_ipc_canasta.py        # Consulta ipc.csv y costo_canasta_mensual.csv; no lee crudos
+│   └── consulta_ipc_canasta.py        # Bloque 1: lee processed/ y escribe las tres figuras
 └── outputs/
     └── figures/
         ├── inflacion_interanual.png       # Variación interanual del IPC, general y alimentos
@@ -515,13 +515,14 @@ Elegir y declarar una sola categoría de salario para el cruce principal (por ej
 
 ## 4. Estado del trabajo
 
-La limpieza ya está hecha. `notebooks/00_importacion_y_limpieza.ipynb` escribe las cuatro tablas de `data/processed/`. Los notebooks `01` a `04` todavía no existen: leen solo esas tablas, siguen [`guia_analisis.md`](guia_analisis.md) y guardan figuras en `outputs/figures/`. `src/consulta_ipc_canasta.py` ya consulta el IPC y el costo sin volver a los crudos.
+La limpieza ya está hecha. `notebooks/00_importacion_y_limpieza.ipynb` escribe las cuatro tablas de `data/processed/`. Los notebooks `01` a `04` todavía no existen: leen solo esas tablas, siguen [`guia_analisis.md`](guia_analisis.md) y guardan figuras en `outputs/figures/`. `src/consulta_ipc_canasta.py` arma las tres figuras del bloque 1 a partir de esas tablas.
 
 | Pieza | Estado |
 |---|---|
 | `ipc.csv`, `costo_canasta_mensual.csv`, `salario_minimo.csv`, `precios_supermercados.csv` | Listas |
 | Notebook 00 y lectores en `src/` | Listos |
-| Notebooks 01–04 y las tres figuras del bloque 1 | Pendientes de análisis |
+| `src/consulta_ipc_canasta.py` y las tres figuras del bloque 1 | El script ya las escribe en `outputs/figures/` |
+| Notebooks 01–04 | Pendientes. El 01 puede importar ese script |
 
 ---
 

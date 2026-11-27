@@ -110,7 +110,7 @@ Usen las variaciones que el INEC ya publicó:
 | 2022, variación anual del Cuadro 5 (base 2013=100) | +2.6 % | +3.9 % |
 | Octubre 2026 / octubre 2025, columna `notas` | +3.3 % | +2.6 % |
 
-`src/consulta_ipc_canasta.py` (opción 4) muestra esas tres parejas y no recalcula una interanual cruzando bases.
+`src/consulta_ipc_canasta.py` escribe `inflacion_interanual.png` con esas tres parejas. No recalcula una interanual cruzando bases ni pide datos por consola.
 
 Las dos primeras no están en el CSV: citen el Cuadro 5 y no las recalculen promediando los meses. La de octubre 2026 sí está en `notas` de las dos filas de ese mes. Esas tres parejas son las que pueden ir en la misma gráfica de inflación, porque ya vienen en porcentaje.
 

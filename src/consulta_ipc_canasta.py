@@ -1,168 +1,226 @@
-"""Consulta de IPC y costo de la canasta básica.
+"""Inflación, canasta y salario."""
 
-Lee solo data/processed/ (ipc.csv y costo_canasta_mensual.csv).
-"""
 from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
-def _ruta_processed() -> Path:
-    """Busca data/processed subiendo desde este archivo o desde el cwd."""
-    for base in (Path(__file__).resolve().parent, Path.cwd()):
-        for carpeta in (base, *base.parents):
-            candidata = carpeta / "data" / "processed"
-            if candidata.is_dir():
-                return candidata
-    return Path("data") / "processed"
+_RAIZ = Path(__file__).resolve().parents[1]
+PROCESSED = _RAIZ / "data" / "processed"
+FIGURAS = _RAIZ / "outputs" / "figures"
 
+# Junio está en ACODECO y en el MEF en los tres años. Agosto de 2022 no existe en el MEF.
+MES_CORTE = 6
+ANIOS = (2019, 2022, 2026)
 
-PROCESSED = _ruta_processed()
-
-MESES = {
-    1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
-    7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre",
-    11: "noviembre", 12: "diciembre",
-}
-GRUPOS = {
-    "total": "total",
-    "alimentos": "alimentos_y_bebidas_no_alcoholicas",
-}
-FUENTES = {
-    "acodeco": "acodeco_historico",
-    "mef": "mef_cbfa",
+# Cuadro 5, variación anual ya publicada. No está como fila mensual en ipc.csv.
+_CUADRO5 = {
+    2019: {"total": -0.3, "alimentos": 0.3},
+    2022: {"total": 2.6, "alimentos": 3.9},
 }
 
-# Variaciones publicadas por el INEC (guia_analisis.md). No se recalculan.
-INFLACION_OFICIAL = pd.DataFrame(
-    [
-        ("2019 (variación anual, Cuadro 5, base 2013=100)", -0.3, 0.3),
-        ("2022 (variación anual, Cuadro 5, base 2013=100)", 2.6, 3.9),
-        ("Oct 2026 / Oct 2025 (columna notas)", 3.3, 2.6),
-    ],
-    columns=["momento", "total_%", "alimentos_%"],
-)
 
-
-def cargar_datos(carpeta: Path = PROCESSED):
-    """Carga las dos tablas y agrega columnas anio y mes desde `fecha`."""
+def cargar_datos(carpeta: Path | str = PROCESSED) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """IPC, costo de la canasta y salario mínimo ya limpios."""
+    carpeta = Path(carpeta)
     ipc = pd.read_csv(carpeta / "ipc.csv", parse_dates=["fecha"])
     costo = pd.read_csv(carpeta / "costo_canasta_mensual.csv", parse_dates=["fecha"])
-    # anio y mes ya vienen en los CSV (esquemas.py); se verifica por seguridad.
-    for nombre, df in (("ipc", ipc), ("costo_canasta_mensual", costo)):
-        faltan = {"anio", "mes", "fecha"} - set(df.columns)
-        if faltan:
-            raise ValueError(f"{nombre}.csv: faltan columnas {sorted(faltan)}")
-    return ipc, costo
+    salario = pd.read_csv(carpeta / "salario_minimo.csv", parse_dates=["fecha_inicio"])
+    return ipc, costo, salario
 
 
-def consultar_ipc(ipc: pd.DataFrame, anio: int, mes: int, grupo: str = "total"):
-    """Devuelve el índice del mes. Nunca mezcla bases distintas."""
-    f = ipc[(ipc["anio"] == anio) & (ipc["mes"] == mes) & (ipc["grupo"] == GRUPOS[grupo])]
-    return f[["fecha", "grupo", "base", "geografia", "indice", "notas"]]
+def inflacion_oficial(ipc: pd.DataFrame) -> pd.DataFrame:
+    """Variación interanual publicada: Cuadro 5 en 2019 y 2022, Cuadro 7 en octubre 2026."""
+    octubre = ipc.loc[
+        ipc["anio"].eq(2026) & ipc["mes"].eq(10) & ipc["grupo"].eq("total"),
+        "notas",
+    ]
+    if octubre.empty or not str(octubre.iloc[0]).strip():
+        raise ValueError("Octubre 2026 no trae la variación interanual en notas")
+    nota = str(octubre.iloc[0])
+    if "+3.3" not in nota or "+2.6" not in nota:
+        raise ValueError(f"La nota de octubre 2026 no trae +3.3 % y +2.6 %: {nota}")
+    filas = [
+        {"momento": "2019", "etiqueta": "2019\nvariación anual", "total": _CUADRO5[2019]["total"], "alimentos": _CUADRO5[2019]["alimentos"]},
+        {"momento": "2022", "etiqueta": "2022\nvariación anual", "total": _CUADRO5[2022]["total"], "alimentos": _CUADRO5[2022]["alimentos"]},
+        {"momento": "oct 2026", "etiqueta": "Oct 2026\nvs oct 2025", "total": 3.3, "alimentos": 2.6},
+    ]
+    return pd.DataFrame(filas)
 
 
-def consultar_costo(costo: pd.DataFrame, anio: int, mes: int, fuente: str | None = None):
-    """Devuelve el costo_total de la canasta. Cada fuente va por separado."""
-    f = costo[(costo["anio"] == anio) & (costo["mes"] == mes)]
-    if fuente:
-        f = f[f["fuente"] == FUENTES[fuente]]
-    return f[["fecha", "fuente", "geografia", "costo_total", "n_productos"]]
+def corte_junio(costo: pd.DataFrame, salario: pd.DataFrame, mes: int = MES_CORTE) -> pd.DataFrame:
+    """Canasta de un mismo mes y salario de gran empresa, Región 1."""
+    r1 = salario.loc[
+        salario["region"].eq(1)
+        & salario["actividad"].eq("comercio_al_por_menor")
+        & salario["categoria"].eq("gran_empresa"),
+        ["anio_analisis", "salario_mensual"],
+    ].rename(columns={"anio_analisis": "anio"})
+    if set(r1["anio"]) != set(ANIOS):
+        raise ValueError(f"Falta el salario de gran empresa, Región 1: {sorted(r1['anio'])}")
+
+    def costos(fuente: str) -> pd.DataFrame:
+        tabla = costo.loc[
+            costo["fuente"].eq(fuente) & costo["mes"].eq(mes) & costo["anio"].isin(ANIOS),
+            ["anio", "costo_total"],
+        ]
+        if set(tabla["anio"]) != set(ANIOS):
+            raise ValueError(f"{fuente} no tiene el mes {mes} en 2019, 2022 y 2026")
+        return tabla.rename(columns={"costo_total": fuente})
+
+    corte = r1.merge(costos("acodeco_historico"), on="anio").merge(costos("mef_cbfa"), on="anio")
+    corte = corte.sort_values("anio").reset_index(drop=True)
+    base_canasta = float(corte.loc[corte["anio"].eq(2019), "acodeco_historico"].iloc[0])
+    base_salario = float(corte.loc[corte["anio"].eq(2019), "salario_mensual"].iloc[0])
+    corte["var_canasta_pct"] = (corte["acodeco_historico"] / base_canasta - 1) * 100
+    corte["var_salario_pct"] = (corte["salario_mensual"] / base_salario - 1) * 100
+    corte["pct_salario_acodeco"] = corte["acodeco_historico"] / corte["salario_mensual"] * 100
+    corte["pct_salario_mef"] = corte["mef_cbfa"] / corte["salario_mensual"] * 100
+    return corte
 
 
-def variacion_costo(costo: pd.DataFrame, mes: int, fuente: str, anio_ini: int, anio_fin: int):
-    """Variación % del costo entre el mismo mes de dos años (misma fuente)."""
-    f = costo[(costo["fuente"] == FUENTES[fuente]) & (costo["mes"] == mes)]
-    v = f.set_index("anio")["costo_total"]
-    if anio_ini not in v.index or anio_fin not in v.index:
-        return None
-    return (v[anio_fin] / v[anio_ini] - 1) * 100
+def _guardar(figura: plt.Figure, nombre: str, directorio: Path) -> Path:
+    directorio.mkdir(parents=True, exist_ok=True)
+    ruta = directorio / nombre
+    figura.savefig(ruta, dpi=140, bbox_inches="tight")
+    plt.close(figura)
+    return ruta
 
 
-# ----------------------------- interfaz de texto -----------------------------
-
-def _pedir_fecha():
-    anio = int(input("Año (2019, 2022, 2025, 2026): "))
-    mes = int(input("Mes (1-12): "))
-    if mes not in MESES:
-        raise ValueError("Mes inválido")
-    return anio, mes
-
-
-def _mostrar_ipc(ipc):
-    anio, mes = _pedir_fecha()
-    g = input("Grupo [total/alimentos]: ").strip().lower() or "total"
-    if g not in GRUPOS:
-        print("Grupo inválido.")
-        return
-    r = consultar_ipc(ipc, anio, mes, g)
-    if r.empty:
-        print(f"Sin datos de IPC para {MESES[mes]} {anio}.")
-        return
-    for _, fila in r.iterrows():
-        print(f"IPC {g} {MESES[mes]} {anio}: {fila['indice']} "
-              f"(base {fila['base']}, {fila['geografia']})")
-        if pd.notna(fila["notas"]):
-            print(f"  Nota INEC: {fila['notas']}")
+def figura_inflacion(inflacion: pd.DataFrame, directorio: Path = FIGURAS) -> Path:
+    """Variación interanual publicada, general y alimentos."""
+    figura, eje = plt.subplots(figsize=(7.2, 4.4))
+    posiciones = range(len(inflacion))
+    ancho = 0.36
+    eje.bar([p - ancho / 2 for p in posiciones], inflacion["total"], width=ancho, label="Total", color="#1f4e79")
+    eje.bar([p + ancho / 2 for p in posiciones], inflacion["alimentos"], width=ancho, label="Alimentos", color="#d4782a")
+    eje.axhline(0, color="#666666", linewidth=0.8)
+    eje.set_xticks(list(posiciones), inflacion["etiqueta"])
+    eje.set_ylabel("Variación interanual (%)")
+    eje.set_title("Inflación publicada por el INEC")
+    eje.legend(frameon=False)
+    eje.spines["top"].set_visible(False)
+    eje.spines["right"].set_visible(False)
+    figura.text(
+        0.01,
+        -0.02,
+        "2019 y 2022: variación anual del Cuadro 5 (base 2013=100). Octubre 2026: Cuadro 7 (base 2024=100).",
+        fontsize=8,
+        color="#444444",
+    )
+    return _guardar(figura, "inflacion_interanual.png", directorio)
 
 
-def _mostrar_costo(costo):
-    anio, mes = _pedir_fecha()
-    fu = input("Fuente [acodeco/mef/ambas]: ").strip().lower() or "ambas"
-    fuente = None if fu == "ambas" else fu
-    if fuente and fuente not in FUENTES:
-        print("Fuente inválida.")
-        return
-    r = consultar_costo(costo, anio, mes, fuente)
-    if r.empty:
-        print(f"Sin costo publicado para {MESES[mes]} {anio} "
-              "(ej.: el MEF no publicó agosto de 2022; no se interpola).")
-        return
-    for _, fila in r.iterrows():
-        print(f"{fila['fuente']}: B/. {fila['costo_total']:.2f} "
-              f"({fila['n_productos']} productos, {fila['geografia']})")
+def figura_aumento(corte: pd.DataFrame, directorio: Path = FIGURAS) -> Path:
+    """Incremento porcentual respecto a 2019, canasta ACODECO y salario de la Región 1."""
+    figura, eje = plt.subplots(figsize=(7.2, 4.4))
+    posiciones = range(len(corte))
+    ancho = 0.36
+    eje.bar(
+        [p - ancho / 2 for p in posiciones],
+        corte["var_canasta_pct"],
+        width=ancho,
+        label="Canasta ACODECO",
+        color="#1f4e79",
+    )
+    eje.bar(
+        [p + ancho / 2 for p in posiciones],
+        corte["var_salario_pct"],
+        width=ancho,
+        label="Salario Región 1",
+        color="#2e7d4f",
+    )
+    eje.axhline(0, color="#666666", linewidth=0.8)
+    for posicion, anio in enumerate(corte["anio"]):
+        if int(anio) == 2019:
+            eje.text(posicion, 0.35, "0 %", ha="center", va="bottom", fontsize=8, color="#444444")
+    eje.set_xticks(list(posiciones), [str(anio) for anio in corte["anio"]])
+    eje.set_ylabel("Cambio respecto a junio de 2019 (%)")
+    eje.set_title("Aumento de la canasta y del salario")
+    eje.legend(frameon=False)
+    eje.spines["top"].set_visible(False)
+    eje.spines["right"].set_visible(False)
+    figura.text(
+        0.01,
+        -0.02,
+        "Junio. Canasta ACODECO. Salario: comercio al por menor, gran empresa, Región 1.",
+        fontsize=8,
+        color="#444444",
+    )
+    return _guardar(figura, "aumento_canasta_salario.png", directorio)
 
 
-def _mostrar_variacion(costo):
-    mes = int(input("Mes a comparar (1-12): "))
-    fu = input("Fuente [acodeco/mef]: ").strip().lower() or "acodeco"
-    a0 = int(input("Año inicial: "))
-    a1 = int(input("Año final: "))
-    if fu not in FUENTES:
-        print("Fuente inválida.")
-        return
-    v = variacion_costo(costo, mes, fu, a0, a1)
-    if v is None:
-        print("No hay datos de ese mes en uno de los dos años.")
-    else:
-        print(f"Costo {fu}, {MESES[mes]} {a0} → {a1}: {v:+.1f} %")
+def figura_canasta_salario(corte: pd.DataFrame, directorio: Path = FIGURAS) -> Path:
+    """Costo de junio en balboas frente al salario mensual. ACODECO y MEF, por separado."""
+    figura, eje = plt.subplots(figsize=(7.6, 4.4))
+    posiciones = range(len(corte))
+    ancho = 0.25
+    eje.bar([p - ancho for p in posiciones], corte["acodeco_historico"], width=ancho, label="Canasta ACODECO", color="#1f4e79")
+    eje.bar(list(posiciones), corte["mef_cbfa"], width=ancho, label="Canasta MEF", color="#d4782a")
+    eje.bar([p + ancho for p in posiciones], corte["salario_mensual"], width=ancho, label="Salario Región 1", color="#2e7d4f")
+    eje.set_xticks(list(posiciones), [str(anio) for anio in corte["anio"]])
+    eje.set_ylabel("Balboas")
+    eje.set_title("Canasta de junio frente al salario mínimo")
+    eje.legend(frameon=False)
+    eje.spines["top"].set_visible(False)
+    eje.spines["right"].set_visible(False)
+    figura.text(
+        0.01,
+        -0.02,
+        "ACODECO y MEF no se promedian. Salario mensual de gran empresa, Región 1 (hora × 208).",
+        fontsize=8,
+        color="#444444",
+    )
+    return _guardar(figura, "canasta_vs_salario.png", directorio)
 
 
-def main():
-    ipc, costo = cargar_datos()
-    acciones = {
-        "1": ("Consultar IPC", lambda: _mostrar_ipc(ipc)),
-        "2": ("Consultar costo de la canasta", lambda: _mostrar_costo(costo)),
-        "3": ("Variación del costo (mismo mes, dos años)", lambda: _mostrar_variacion(costo)),
-        "4": ("Inflación oficial INEC (2019, 2022, oct 2026)",
-              lambda: print(INFLACION_OFICIAL.to_string(index=False))),
+def guardar_figuras(
+    ipc: pd.DataFrame | None = None,
+    costo: pd.DataFrame | None = None,
+    salario: pd.DataFrame | None = None,
+    directorio: Path | str = FIGURAS,
+) -> pd.DataFrame:
+    """Escribe las tres figuras y devuelve el corte de junio usado en las dos últimas."""
+    if ipc is None or costo is None or salario is None:
+        ipc, costo, salario = cargar_datos()
+    directorio = Path(directorio)
+    corte = corte_junio(costo, salario)
+    figura_inflacion(inflacion_oficial(ipc), directorio)
+    figura_aumento(corte, directorio)
+    figura_canasta_salario(corte, directorio)
+    _comprobar(corte)
+    return corte
+
+
+def _comprobar(corte: pd.DataFrame) -> None:
+    """Junio, gran empresa, Región 1: las cifras de la guía de análisis."""
+    esperado = {
+        2019: (260.64, 565.76),
+        2022: (285.92, 584.48),
+        2026: (303.45, 628.16),
     }
-    while True:
-        print("\n--- IPC y costo de la canasta ---")
-        for k, (txt, _) in acciones.items():
-            print(f"{k}. {txt}")
-        print("0. Salir")
-        op = input("Opción: ").strip()
-        if op == "0":
-            break
-        if op in acciones:
-            try:
-                acciones[op][1]()
-            except ValueError as e:
-                print(f"Entrada inválida: {e}")
-        else:
-            print("Opción no válida.")
+    for anio, (canasta, pago) in esperado.items():
+        fila = corte.loc[corte["anio"].eq(anio)].iloc[0]
+        if abs(fila["acodeco_historico"] - canasta) > 0.02 or abs(fila["salario_mensual"] - pago) > 0.02:
+            raise ValueError(f"El corte de junio {anio} no coincide con la guía: {fila.to_dict()}")
+
+
+def main() -> None:
+    corte = guardar_figuras()
+    print("Junio, comercio al por menor, gran empresa, Región 1")
+    print(
+        corte.assign(
+            acodeco_historico=lambda df: df["acodeco_historico"].round(2),
+            mef_cbfa=lambda df: df["mef_cbfa"].round(2),
+            salario_mensual=lambda df: df["salario_mensual"].round(2),
+            pct_salario_acodeco=lambda df: df["pct_salario_acodeco"].round(1),
+        )[
+            ["anio", "acodeco_historico", "mef_cbfa", "salario_mensual", "pct_salario_acodeco", "var_canasta_pct", "var_salario_pct"]
+        ].to_string(index=False)
+    )
+    print(f"Figuras en {FIGURAS.relative_to(_RAIZ)}")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 Este proyecto compara el costo de la canasta básica de alimentos con el salario mínimo en la provincia de Panamá, en tres momentos: **2019** (antes de la pandemia), **2022** (después) y **2026** (el año en curso). La pregunta que guía el análisis es cuánto del salario mínimo se va en comida.
 
-Cada número sale de una fuente oficial (INEC, ACODECO, MEF o Gaceta Oficial). El inventario de archivos, las URLs y las reglas de limpieza están en [`references/plan_datos.md`](references/plan_datos.md).
+Cada número sale de una fuente oficial (INEC, ACODECO, MEF o Gaceta Oficial).
 
 ## Qué se analiza
 
@@ -35,6 +35,7 @@ canasta-basica-salario/
 │   ├── interim/               # limpiezas a medias, todavía no para el análisis
 │   └── processed/             # tablas tidy: ipc, costo_canasta_mensual, salario_minimo, precios_supermercados
 ├── notebooks/                 # 00 limpieza; 01 inflación; 02 salario mínimo; 03 poder adquisitivo; 04 supermercados
+├── streamlit_app/             # reporte ejecutivo; se abre con Streamlit
 ├── src/                       # lectura y limpieza; los notebooks no parsean crudos
 └── outputs/
     └── figures/
@@ -64,6 +65,15 @@ python -m ipykernel install --user --name canasta-vs-salario --display-name "Can
 jupyter lab
 ```
 
+Para abrir el reporte, desde la raíz y con el entorno activado:
+
+```bash
+pip install -r streamlit_app/requirements.txt
+streamlit run streamlit_app/app.py
+```
+
+Streamlit abre http://localhost:8501. El reporte lee `data/processed/` y las tablas de `outputs/tablas/` que escriben los notebooks `03` y `04`.
+
 Dependencias: `pandas`, `openpyxl` y `xlrd` (Excel del INEC), `pdfplumber` (PDF de ACODECO y del MEF), `matplotlib`, `jupyter`, `requests` y `lxml`.
 
 Las gacetas del salario están escaneadas. `pdfplumber` no extrae el texto. Hay que transcribir las tasas ya verificadas en `references/plan_datos.md` (o usar OCR con `tesseract -l spa`, que no forma parte de `requirements.txt`) y dejarlas en `src/`, sin recalcularlas desde un OCR sucio.
@@ -73,11 +83,11 @@ Las gacetas del salario están escaneadas. `pdfplumber` no extrae el texto. Hay 
 1. No editar nada dentro de `data/raw/`.
 2. La lectura de cada fuente vive en `src/` (`io_inec.py`, `io_acodeco.py`, `io_mef.py`, `io_salarios.py`, más `limpieza.py`).
 3. El notebook `00` llama a ese código, corre los controles de calidad y escribe `data/processed/`.
-4. Los notebooks `01` a `04` solo leen `data/processed/` y guardan figuras en `outputs/figures/`. El notebook `01` (inflación) produce las tres figuras de la gráfica de tiempo, del incremento porcentual y de la canasta frente al salario. La forma de leer cada tabla, los meses que sí están y las fórmulas están en [`references/guia_analisis.md`](references/guia_analisis.md).
+4. Los notebooks `01` a `04` solo leen `data/processed/` y guardan figuras en `outputs/figures/`. El notebook `01` (inflación) produce las tres figuras de la gráfica de tiempo, del incremento porcentual y de la canasta frente al salario.
 
 Controles mínimos antes de graficar: 59 productos por mes en los CSV, precios faltantes en `NaN` (nunca en 0), series de costo con los meses que realmente trae cada fuente, ningún gráfico de niveles del IPC que mezcle base 2013 = 100 con base 2024 = 100, y la gráfica de tiempo de inflación construida con la variación interanual, no con niveles encadenados de bases distintas.
 
-Los CSV de ACODECO vienen en **latin-1**, no en UTF-8. El separador cambia entre coma y punto y coma, y algunos meses traen filas de cabecera vacías, columnas de índice o un pie (`Costo Total`, `FUENTE:`). El detalle, archivo por archivo, está en la sección 3 de [`references/plan_datos.md`](references/plan_datos.md).
+Los CSV de ACODECO vienen en **latin-1**, no en UTF-8. El separador cambia entre coma y punto y coma, y algunos meses traen filas de cabecera vacías, columnas de índice o un pie (`Costo Total`, `FUENTE:`).
 
 ## Fuentes
 

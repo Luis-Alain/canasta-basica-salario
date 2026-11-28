@@ -24,7 +24,8 @@ canasta-basica-salario/
 ├── README.md
 ├── requirements.txt
 ├── references/
-│   └── plan_datos.md          # fuentes, cifras de control y reglas de limpieza
+│   ├── plan_datos.md          # fuentes, cifras de control y reglas de limpieza
+│   └── guia_analisis.md       # cómo analizar las tablas de data/processed/
 ├── data/
 │   ├── raw/                   # archivos tal cual salen de la fuente; no se editan
 │   │   ├── acodeco/           # CSV 2019 y 2022, histórico y PDF de septiembre 2026
@@ -72,7 +73,7 @@ Las gacetas del salario están escaneadas. `pdfplumber` no extrae el texto. Hay 
 1. No editar nada dentro de `data/raw/`.
 2. La lectura de cada fuente vive en `src/` (`io_inec.py`, `io_acodeco.py`, `io_mef.py`, `io_salarios.py`, más `limpieza.py`).
 3. El notebook `00` llama a ese código, corre los controles de calidad y escribe `data/processed/`.
-4. Los notebooks `01` a `04` solo leen `data/processed/` y guardan figuras en `outputs/figures/`. El notebook `01` (inflación) produce las tres figuras de la gráfica de tiempo, del incremento porcentual y de la canasta frente al salario.
+4. Los notebooks `01` a `04` solo leen `data/processed/` y guardan figuras en `outputs/figures/`. El notebook `01` (inflación) produce las tres figuras de la gráfica de tiempo, del incremento porcentual y de la canasta frente al salario. La forma de leer cada tabla, los meses que sí están y las fórmulas están en [`references/guia_analisis.md`](references/guia_analisis.md).
 
 Controles mínimos antes de graficar: 59 productos por mes en los CSV, precios faltantes en `NaN` (nunca en 0), series de costo con los meses que realmente trae cada fuente, ningún gráfico de niveles del IPC que mezcle base 2013 = 100 con base 2024 = 100, y la gráfica de tiempo de inflación construida con la variación interanual, no con niveles encadenados de bases distintas.
 

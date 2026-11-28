@@ -1,6 +1,6 @@
 # Plan de datos: ¿Cuánto del salario mínimo se va en comida?
 
-**Proyecto:** `canasta-vs-salario-panama`  
+**Proyecto:** `canasta-basica-salario`  
 **Alcance cerrado:** solo **provincia de Panamá**; años **2019** (prepandemia), **2022** (post) y **2026** (actualidad).  
 **Público:** equipo SIC, nivel inicial de pandas.  
 **Regla:** no inventar cifras ni enlaces. Todo lo que aparece aquí se descargó o se leyó de la fuente oficial el 22 de noviembre de 2026 (hora de Panamá, UTC-5).  
@@ -8,12 +8,10 @@
 
 Cuatro bloques de análisis:
 
-1. IPC y costo de la canasta (INEC + histórico ACODECO + MEF, Panamá y San Miguelito).
-2. Salario mínimo (Región 1 en 2019, 2022 y 2026; Región 1 vs Región 2 solo en este bloque).
-3. Poder adquisitivo (cruce de canasta e inflación contra el salario de la Región 1).
-4. Supermercados (CSV ACODECO 2019 y 2022 + PDF quincenal de septiembre 2026; opcional capital vs San Miguelito).
-
-Las muestras inspeccionadas están en `sic-canasta/muestras/`.
+1. Inflación, canasta y salario. Variación interanual del IPC (general y alimentos); incremento porcentual 2019→2022→2026 de la canasta de ACODECO y del salario mínimo de la Región 1; y la canasta en balboas frente a ese salario. El costo mensual del MEF va en paralelo.
+2. Salario mínimo (Región 1 y Región 2 en 2019, 2022 y 2026; el contraste entre regiones solo va en este bloque).
+3. Poder adquisitivo (qué parte del salario de la Región 1 alcanza para pagar la canasta, y si la comida subió más que el salario).
+4. Supermercados (precio de los 59 productos por establecimiento: CSV ACODECO 2019 y 2022 + PDF quincenal de septiembre 2026).
 
 ---
 
@@ -31,7 +29,7 @@ El INEC **no tiene un solo cuadro** con 2019, 2022 y 2026 en la misma base y la 
 
 #### A) Serie comparable 2019 vs 2022 (y hasta agosto 2025)
 
-**Geografía:** distritos de **Panamá y San Miguelito**.  
+**Geografía publicada:** distritos de **Panamá y San Miguelito**. En el relato del proyecto esa serie es el área urbana de la provincia y se trata como provincia de Panamá. La columna `geografia` conserva `panama_y_san_miguelito`, para no mezclarla con la serie de 2026.  
 **Base:** **2013 = 100**.  
 **Ponderaciones:** Encuesta de Ingresos y Gastos de los Hogares 2007/08 (2,103 hogares).  
 **Publicación:** *Índice de Precios al Consumidor (IPC) 2017-2025*, página  
@@ -109,12 +107,16 @@ indice_2024base = indice_2013base * factor
 **Reglas para el equipo (no saltárselas):**
 
 1. Ese factor es **oficial solo para el TOTAL del IPC Nacional Urbano**. No se encontró un anexo equivalente para “Panamá y San Miguelito”, ni para “provincia de Panamá”, ni para el grupo de alimentos.
-2. **No apliquen** el factor nacional a la serie de Panamá y San Miguelito, ni a los alimentos.
-3. **No pongan en el mismo eje** un índice 2019 = 104.2 (base 2013) y un índice 2026 = 102.9 (base 2024): no son comparables.
-4. Forma correcta de usar 2026 en este proyecto:
-   - **2019 vs 2022:** comparar **niveles** en base 2013=100 (Cuadros 5 y 6).
-   - **2026 (actualidad):** reportar niveles en base 2024=100 y, sobre todo, la **variación interanual** ya calculada por el INEC (Cuadro 7), más el costo de la canasta ACODECO/MEF, que sí está en balboas en los tres años.
-5. El Anexo 4 (nacional urbano, enero 2024–octubre 2026, ya en 2024=100) solo sirve como contexto nacional, no como serie del proyecto:  
+2. No apliquen el factor nacional a la serie de Panamá y San Miguelito, ni a los alimentos.
+3. Los niveles del índice se grafican dentro de una sola base. Un índice 2019 = 104.2 (base 2013) y un índice 2026 = 102.9 (base 2024) van en paneles distintos.
+4. La gráfica de tiempo del proyecto es la **variación interanual en %**, del índice general y de alimentos (`outputs/figures/inflacion_interanual.png`). Ese porcentaje sí se compara entre 2019, 2022 y 2026. Los niveles encadenados de bases distintas no son esa gráfica.
+5. La variación interanual mensual de 2019 y la de 2022 necesitan el año previo en la misma base (2018 y 2021, Cuadro 6). Esos meses están en el archivo fuente y **no** se guardaron en `ipc.csv`, que solo trae los años del proyecto más diciembre 2025–octubre 2026. Mientras no se agreguen, el contraste de inflación entre los tres momentos usa las variaciones que el INEC ya publicó:
+   - Cuadro 5, 2019: total −0.3 %, alimentos +0.3 %.
+   - Cuadro 5, 2022: total +2.6 %, alimentos +3.9 %.
+   - Cuadro 7, octubre 2026 / octubre 2025: total +3.3 %, alimentos +2.6 % (columna `notas` de `ipc.csv`).
+   `src/consulta_ipc_canasta.py` escribe las tres figuras del bloque con esas variaciones. No recalcula una interanual cruzando bases.
+6. El costo de la canasta, en balboas, sí se compara en los tres años. ACODECO y el MEF siguen en paralelo. Las otras dos figuras del bloque son `aumento_canasta_salario.png` (incremento % 2019→2022→2026 de la canasta ACODECO y del salario de la Región 1) y `canasta_vs_salario.png` (costo en balboas frente a ese salario).
+7. El Anexo 4 (nacional urbano, enero 2024–octubre 2026, ya en 2024=100) solo sirve como contexto nacional, no como serie del proyecto:  
    https://www.inec.gob.pa/archivos/A0705547520261117084308Anexo%204.xlsx
 
 ### 1.2 Bloque 1 — Costo de la canasta ACODECO (histórico)
@@ -141,7 +143,7 @@ Serie 2026 (ene–ago): 304.40, 303.04, 302.79, 303.53, 305.13, 303.45, 303.67, 
 ### 1.3 Bloque 1 — Costo calórico MEF (Panamá y San Miguelito)
 
 Catálogo: https://www.mef.gob.pa/canasta-basica/  
-Metodología constante y declarada en los informes: **59 productos**, 3.5 personas, 2,338.6 kcal/día, precios del INEC. (El Resto Urbano, 50 productos, **queda fuera del alcance**: el proyecto se quedó en la provincia de Panamá / Panamá y San Miguelito.)
+Metodología constante y declarada en los informes: **59 productos**, 3.5 personas, 2,338.6 kcal/día, precios del INEC. La cifra que entra al proyecto es la de los distritos de Panamá y San Miguelito. En el README ese costo se llama familiar de la provincia, porque ese es el alcance del análisis. El Resto urbano (50 productos) queda fuera.
 
 El catálogo, en la sección 2019, **solo lista febrero, marzo y abril**, pero existen los 12 meses en PDF numerados (todos se descargaron, HTTP 200, y se leyeron). En 2022 **falta agosto** en el catálogo. En 2026 hay informes hasta **agosto**; enero y febrero vienen en un solo PDF.
 
@@ -268,12 +270,16 @@ No hay CSV abiertos de ACODECO para 2026 ni para otras provincias.
 
 ## 2. Estructura base del repositorio
 
-Nombre: `canasta-vs-salario-panama`
+Nombre de la carpeta: `canasta-basica-salario`
 
 ```text
-canasta-vs-salario-panama/
-├── README.md                          # Objetivo, alcance (provincia de Panamá, 2019/2022/2026), fuentes y cómo reproducir
+canasta-basica-salario/
+├── README.md                          # Objetivo, alcance y cómo reproducir
 ├── requirements.txt                   # pandas, openpyxl, xlrd, pdfplumber, matplotlib, jupyter, requests, lxml
+├── references/
+│   ├── plan_datos.md                  # Este plan: fuentes, cifras de control y reglas de limpieza
+│   ├── guia_analisis.md               # Cómo analizar las tablas de data/processed/
+│   └── mapa_productos.csv             # Los 59 productos, nombre de fuente → producto_estandar
 ├── data/
 │   ├── raw/                           # Archivos tal cual salen de la fuente; no se editan
 │   │   ├── acodeco/
@@ -282,33 +288,29 @@ canasta-vs-salario-panama/
 │   │   │   ├── HistoricoCBFA_2015-2026.pdf
 │   │   │   └── CBA_PreciosSupermercadosXRutas_2daSeptiembre2026.pdf
 │   │   ├── mef/                       # PDF mensuales 2019, 2022 y 2026 (solo PySM se va a usar)
-│   │   ├── inec/
-│   │   │   ├── Cuadro5_anual_PySM_2017-24.xlsx
-│   │   │   ├── Cuadro6_mensual_PySM_2017-25.xlsx
-│   │   │   ├── Cuadro7_provincia_oct2026.xlsx
-│   │   │   ├── Cuadro8_provincia_mensual_2026.xlsx
-│   │   │   ├── Anexo3_enlace_nacional.xlsx
-│   │   │   └── Nota_tecnica_IPC_2024.pdf
+│   │   ├── inec/                      # Cuadros 5 y 6 en CSV; Cuadros 7 y 8 y Anexo 3 en Excel
 │   │   └── mitradel/                  # Las 3 gacetas (DE 75, DE 74, DE 13)
-│   ├── interim/                       # Salidas a medio limpiar (un mes, un PDF), todavía no para el análisis
-│   └── processed/                     # Tablas tidy finales (csv o parquet): ipc, costo_canasta_mensual, salario_minimo, precios_supermercados
+│   ├── interim/                       # Salidas a medio limpiar, todavía no para el análisis
+│   └── processed/                     # Tablas tidy: ipc, costo_canasta_mensual, salario_minimo, precios_supermercados
 ├── notebooks/
-│   ├── 00_importacion_y_limpieza.ipynb  # Llama a src/, muestra controles de calidad, guarda processed/
-│   ├── 01_ipc_y_costo_canasta.ipynb     # Bloque 1
+│   ├── 00_importacion_y_limpieza.ipynb  # Llama a src/, corre controles, escribe processed/
+│   ├── 01_inflacion.ipynb               # Bloque 1: las tres figuras de inflación, canasta y salario
 │   ├── 02_salario_minimo.ipynb          # Bloque 2 (incluye R1 vs R2)
 │   ├── 03_poder_adquisitivo.ipynb       # Bloque 3
 │   └── 04_supermercados.ipynb           # Bloque 4
 ├── src/
-│   ├── __init__.py
-│   ├── io_acodeco.py                  # Lectura robusta de CSV 2019/2022 y extracción de los dos PDF
-│   ├── io_inec.py                     # Lectura de los Excel del IPC y armado de la tabla ipc
-│   ├── io_mef.py                      # Extracción del costo PySM desde cada PDF del MEF
-│   ├── io_salarios.py                 # Tabla de salarios a partir de la transcripción verificada de los decretos
-│   ├── limpieza.py                    # Nombres de producto y de tienda, zonas, fechas, asteriskos
-│   └── esquemas.py                    # Columnas canónicas y validaciones simples
-├── outputs/
-│   └── figures/                       # Gráficos de los cuatro bloques
-└── referencias/                       # Este plan y, si se quiere, un diccionario de tiendas/zonas en CSV
+│   ├── esquemas.py                    # Columnas canónicas y validaciones simples
+│   ├── limpieza.py                    # Nombres de producto y de tienda, zonas, fechas, asteriscos
+│   ├── io_acodeco.py                  # CSV 2019/2022 y los dos PDF
+│   ├── io_inec.py                     # Cuadro 6 CSV y Cuadros 7 y 8; arma ipc
+│   ├── io_mef.py                      # Costo PySM desde cada PDF del MEF
+│   ├── io_salarios.py                 # Tasas ya verificadas de los tres decretos
+│   └── consulta_ipc_canasta.py        # Bloque 1: lee processed/ y escribe las tres figuras
+└── outputs/
+    └── figures/
+        ├── inflacion_interanual.png       # Variación interanual del IPC, general y alimentos
+        ├── aumento_canasta_salario.png    # Incremento % 2019→2022→2026, canasta ACODECO y salario R1
+        └── canasta_vs_salario.png         # Costo de la canasta (B/.) frente al salario de la Región 1
 ```
 
 Un propósito por pieza: los CSV crudos no se tocan; toda la lógica de rarezas (separador, columnas de más, pie de página) vive en `src/`; los notebooks de análisis solo leen `data/processed/`.
@@ -494,7 +496,7 @@ Por cada PDF: `pdftotext -layout` o pdfplumber; buscar en la introducción la or
 - 59 productos por mes en los CSV (después de quitar Costo Total / FUENTE).
 - Ningún precio faltante convertido a 0.
 - Series ACODECO histórico: 12 + 12 + 8 meses.
-- `ipc` con `base` y `geografia` siempre llenos; ningún gráfico de niveles mezcla 2013=100 con 2024=100.
+- `ipc` con `base` y `geografia` siempre llenos. Los niveles del IPC se grafican dentro de una sola base. La gráfica de tiempo de inflación es la variación interanual en %, no una cadena de niveles de bases distintas.
 - Salarios 2019 sin fila de supermercados 5+.
 - Bloque 3: canasta solo contra **Región 1**; el equivalente mensual es hora × 208, salvo el doméstico.
 
@@ -511,16 +513,16 @@ Elegir y declarar una sola categoría de salario para el cruce principal (por ej
 
 ---
 
-## 4. División de trabajo (4 personas)
+## 4. Estado del trabajo
 
-| Persona | Encargo | Entrega |
-|---|---|---|
-| **A** | Estructura del repo, `requirements.txt`, README, descarga de *todos* los raw, y `src/io_inec.py` + tabla `ipc` (incluido el tratamiento del cambio de base). | `data/raw/` completo, `data/processed/ipc.csv`, nota metodológica del IPC en el README |
-| **B** | `src/io_acodeco.py` y `limpieza.py`: CSV 2019/2022, histórico PDF, PDF de septiembre 2026, diccionario de productos, cadenas y zonas. | `precios_supermercados.csv`, `costo_canasta_mensual` (parte ACODECO) |
-| **C** | `src/io_mef.py` (costo PySM de todos los meses acordados) y `src/io_salarios.py` (transcripción verificada de los tres decretos, R1 y R2). | `costo_canasta_mensual` (parte MEF), `salario_minimo.csv` |
-| **D** | Notebooks 01–04: gráficos y resultados; bloque 3 con el cruce ya limpio; revisión de que nadie mezcle bases del IPC ni sume NaN como cero. | `notebooks/01`–`04`, `outputs/figures/` |
+La limpieza ya está hecha. `notebooks/00_importacion_y_limpieza.ipynb` escribe las cuatro tablas de `data/processed/`. Los notebooks `01` a `04` todavía no existen: leen solo esas tablas, siguen [`guia_analisis.md`](guia_analisis.md) y guardan figuras en `outputs/figures/`. `src/consulta_ipc_canasta.py` arma las tres figuras del bloque 1 a partir de esas tablas.
 
-El notebook `00` lo pueden armar A y B juntos el primer día, para que C y D no analicen crudos. Reunión corta de control cuando existan las cuatro tablas de `data/processed/`.
+| Pieza | Estado |
+|---|---|
+| `ipc.csv`, `costo_canasta_mensual.csv`, `salario_minimo.csv`, `precios_supermercados.csv` | Listas |
+| Notebook 00 y lectores en `src/` | Listos |
+| `src/consulta_ipc_canasta.py` y las tres figuras del bloque 1 | El script ya las escribe en `outputs/figures/` |
+| Notebooks 01–04 | Pendientes. El 01 puede importar ese script |
 
 ---
 
@@ -529,5 +531,5 @@ El notebook `00` lo pueden armar A y B juntos el primer día, para que C y D no 
 - Alcance: provincia de Panamá, años 2019, 2022 y 2026. No hay CSV provinciales de ACODECO para el interior.
 - ACODECO y MEF se muestran en paralelo, no se fusionan en una sola “canasta”.
 - El salario de la Región 2 no se cruza con la canasta de la capital; solo ilustra la brecha del país en el bloque 2.
-- El IPC de 2026 no se “empalma” con 2019/2022 salvo con un factor oficial que, hoy, **no existe** para Panamá y San Miguelito ni para alimentos.
-- Este archivo es la guía de datos. La hoja de Google Sheets del inventario no se modificó.
+- El IPC de 2026 no se empalma con 2019/2022. No hay un factor oficial para Panamá y San Miguelito ni para alimentos. La gráfica de tiempo usa la variación interanual en %; los niveles se quedan dentro de cada base.
+- Este archivo es la guía de datos. Cómo analizar las tablas limpias está en [`guia_analisis.md`](guia_analisis.md). La hoja de Google Sheets del inventario no se modificó.
